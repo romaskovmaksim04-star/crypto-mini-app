@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Crypto Sigma AI</title>
+    <title>Crypto Chart</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -16,149 +16,209 @@
         }
         #header {
             background: #1a1a1a;
-            padding: 12px 16px;
+            padding: 10px 16px;
             text-align: center;
             border-bottom: 1px solid #333;
             font-weight: bold;
-            font-size: 16px;
-        }
-        #messages {
-            flex: 1;
-            overflow-y: auto;
-            padding: 16px;
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-        }
-        .msg {
-            max-width: 85%;
-            padding: 10px 14px;
-            border-radius: 12px;
             font-size: 14px;
-            line-height: 1.4;
         }
-        .msg.user {
-            background: #2563eb;
-            align-self: flex-end;
-        }
-        .msg.ai {
-            background: #1f1f1f;
-            align-self: flex-start;
-            border: 1px solid #333;
-        }
-        #input-area {
-            padding: 12px;
-            border-top: 1px solid #333;
-            display: flex;
-            gap: 8px;
-            background: #1a1a1a;
-        }
-        #input {
+        #chart-container {
             flex: 1;
-            padding: 10px 14px;
-            border-radius: 20px;
+            min-height: 0;
+        }
+        #timeframes {
+            display: flex;
+            gap: 4px;
+            padding: 8px;
+            background: #1a1a1a;
+            overflow-x: auto;
+            border-top: 1px solid #333;
+        }
+        .tf-btn {
+            padding: 6px 12px;
+            border-radius: 6px;
             border: 1px solid #333;
             background: #0a0a0a;
-            color: #fff;
-            font-size: 14px;
-            outline: none;
+            color: #aaa;
+            font-size: 12px;
+            cursor: pointer;
+            white-space: nowrap;
         }
-        #send {
-            padding: 10px 18px;
-            border-radius: 20px;
-            border: none;
+        .tf-btn.active {
             background: #2563eb;
             color: #fff;
-            font-weight: bold;
-            cursor: pointer;
+            border-color: #2563eb;
         }
-        .loading { color: #888; font-style: italic; }
+        #info-panel {
+            padding: 12px 16px;
+            background: #1a1a1a;
+            border-top: 1px solid #333;
+            font-size: 13px;
+            line-height: 1.5;
+        }
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 4px 0;
+        }
+        .info-label { color: #888; }
+        .info-value { color: #fff; font-weight: bold; }
+        .green { color: #4ade80; }
+        .red { color: #f87171; }
+        #loading {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #888;
+            font-size: 14px;
+        }
     </style>
 </head>
 <body>
-    <div id="header">🧠 Crypto Sigma AI</div>
-    <div id="messages">
-        <div class="msg ai">
-            👊 Брат, я Доминик — твой крипто-аналитик.<br>
-            Спрашивай про мемкоины, снайпинг, ончейн-анализ, стратегии.<br>
-            Шарю за весь рынок — BTC, ETH, SOL и остальное.
-        </div>
+    <div id="header">📊 График токена</div>
+    <div id="chart-container">
+        <div id="loading">Загрузка графика...</div>
     </div>
-    <div id="input-area">
-        <input type="text" id="input" placeholder="Спроси про крипту..." autocomplete="off">
-        <button id="send" onclick="sendMessage()">→</button>
+    <div id="timeframes">
+        <button class="tf-btn" onclick="setTimeframe('1')">1м</button>
+        <button class="tf-btn" onclick="setTimeframe('5')">5м</button>
+        <button class="tf-btn active" onclick="setTimeframe('15')">15м</button>
+        <button class="tf-btn" onclick="setTimeframe('30')">30м</button>
+        <button class="tf-btn" onclick="setTimeframe('60')">1ч</button>
+        <button class="tf-btn" onclick="setTimeframe('240')">4ч</button>
+        <button class="tf-btn" onclick="setTimeframe('1D')">1д</button>
+    </div>
+    <div id="info-panel">
+        <div class="info-row">
+            <span class="info-label">Адрес токена</span>
+            <span class="info-value" id="token-address">Загрузка...</span>
+        </div>
+        <div class="info-row">
+            <span class="info-label">Цена</span>
+            <span class="info-value" id="token-price">...</span>
+        </div>
+        <div class="info-row">
+            <span class="info-label">Ликвидность</span>
+            <span class="info-value" id="token-liquidity">...</span>
+        </div>
+        <div class="info-row">
+            <span class="info-label">Market Cap</span>
+            <span class="info-value" id="token-mcap">...</span>
+        </div>
+        <div class="info-row">
+            <span class="info-label">Объём (24ч)</span>
+            <span class="info-value" id="token-volume">...</span>
+        </div>
+        <div class="info-row">
+            <span class="info-label">Изменение (24ч)</span>
+            <span class="info-value" id="token-change">...</span>
+        </div>
     </div>
 
     <script>
-        const API_KEY = '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';
-        const messages = [
-            { role: 'system', content: 'Ты Доминик — дерзкий крипто-аналитик. Твоя специализация: мемкоины Solana, снайпинг, ончейн-анализ. Но ты шаришь за весь рынок крипты — Bitcoin, Ethereum, Solana, DeFi, NFT, макроэкономика. Общаешься по-пацански, но по делу. Даёшь конкретные советы с цифрами. Если вопрос не про крипту — отвечаешь что ты только по крипте. Отвечаешь кратко, до 500 символов. Если не знаешь точную цену — так и скажи, не выдумывай.' }
-        ];
+        // Получаем адрес токена из URL параметров
+        const params = new URLSearchParams(window.location.search);
+        const tokenAddress = params.get('token') || '6YFxato32MVMrK1mQwYyaLawGt6FhB5XGDWavmDppump';
+        
+        // Показываем адрес
+        document.getElementById('token-address').textContent = tokenAddress.slice(0, 8) + '...' + tokenAddress.slice(-6);
 
-        async function sendMessage() {
-            const input = document.getElementById('input');
-            const text = input.value.trim();
-            if (!text) return;
+        let currentTimeframe = '15';
+        let widget = null;
 
-            addMessage(text, 'user');
-            input.value = '';
+        function setTimeframe(tf) {
+            currentTimeframe = tf;
+            
+            // Обновляем кнопки
+            document.querySelectorAll('.tf-btn').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            // Обновляем график
+            loadChart();
+        }
 
-            const loadingId = addMessage('Думаю...', 'ai loading');
+        function loadChart() {
+            document.getElementById('chart-container').innerHTML = '';
+            document.getElementById('loading').style.display = 'flex';
+            
+            // Создаём контейнер для виджета
+            const container = document.createElement('div');
+            container.id = 'tv-widget';
+            container.style.width = '100%';
+            container.style.height = '100%';
+            document.getElementById('chart-container').appendChild(container);
+            
+            // TradingView виджет
+            widget = new TradingView.widget({
+                "width": "100%",
+                "height": "100%",
+                "symbol": "DEXSCREENER:" + tokenAddress,
+                "interval": currentTimeframe,
+                "timezone": "Etc/UTC",
+                "theme": "dark",
+                "style": "1",
+                "locale": "ru",
+                "toolbar_bg": "#1a1a1a",
+                "enable_publishing": false,
+                "hide_top_toolbar": true,
+                "hide_legend": false,
+                "save_image": false,
+                "container_id": "tv-widget",
+                "studies": ["MASimple@tv-basicstudies"],
+                "overrides": {
+                    "mainSeriesProperties.candleStyle.upColor": "#4ade80",
+                    "mainSeriesProperties.candleStyle.downColor": "#f87171",
+                    "mainSeriesProperties.candleStyle.borderUpColor": "#4ade80",
+                    "mainSeriesProperties.candleStyle.borderDownColor": "#f87171",
+                    "mainSeriesProperties.candleStyle.wickUpColor": "#4ade80",
+                    "mainSeriesProperties.candleStyle.wickDownColor": "#f87171"
+                }
+            });
 
-            messages.push({ role: 'user', content: text });
+            widget.onChartReady(function() {
+                document.getElementById('loading').style.display = 'none';
+            });
+        }
 
+        // Загрузка данных токена с Dexscreener
+        async function loadTokenInfo() {
             try {
-                const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': 'Bearer ' + API_KEY,
-                        'Content-Type': 'application/json',
-                        'HTTP-Referer': window.location.href,
-                        'X-Title': 'Crypto Sigma'
-                    },
-                    body: JSON.stringify({
-                        model: 'google/gemini-2.0-flash-exp:free',
-                        messages: messages.slice(-10),
-                        max_tokens: 600
-                    })
-                });
-
-                if (!response.ok) {
-                    const errorText = await response.text();
-                    throw new Error('HTTP ' + response.status);
-                }
-
+                const response = await fetch('https://api.dexscreener.com/latest/dex/tokens/' + tokenAddress);
                 const data = await response.json();
+                const pairs = data.pairs || [];
+                
+                if (pairs.length > 0) {
+                    const pair = pairs[0];
+                    const price = parseFloat(pair.priceUsd || 0);
+                    const liquidity = pair.liquidity?.usd || 0;
+                    const mcap = pair.fdv || 0;
+                    const volume = pair.volume?.h24 || 0;
+                    const priceChange = pair.priceChange?.h24 || 0;
 
-                if (!data.choices || !data.choices[0]) {
-                    throw new Error('Bad response');
+                    document.getElementById('token-price').textContent = '$' + (price < 0.00001 ? price.toFixed(10) : price.toFixed(6));
+                    document.getElementById('token-liquidity').textContent = '$' + Number(liquidity).toLocaleString();
+                    document.getElementById('token-mcap').textContent = '$' + Number(mcap).toLocaleString();
+                    document.getElementById('token-volume').textContent = '$' + Number(volume).toLocaleString();
+                    
+                    const changeEl = document.getElementById('token-change');
+                    changeEl.textContent = (priceChange >= 0 ? '+' : '') + priceChange.toFixed(2) + '%';
+                    changeEl.className = 'info-value ' + (priceChange >= 0 ? 'green' : 'red');
+                } else {
+                    document.getElementById('token-price').textContent = 'Нет данных';
                 }
-
-                const reply = data.choices[0].message.content;
-                messages.push({ role: 'assistant', content: reply });
-
-                document.getElementById(loadingId).remove();
-                addMessage(reply, 'ai');
             } catch (e) {
-                document.getElementById(loadingId).remove();
-                addMessage('Ошибка: ' + e.message + '. Попробуй ещё раз.', 'ai');
+                document.getElementById('token-price').textContent = 'Ошибка';
             }
         }
 
-        function addMessage(text, type) {
-            const div = document.createElement('div');
-            div.className = 'msg ' + type;
-            div.textContent = text;
-            const id = 'msg-' + Date.now();
-            div.id = id;
-            document.getElementById('messages').appendChild(div);
-            document.getElementById('messages').scrollTop = document.getElementById('messages').scrollHeight;
-            return id;
-        }
+        // Загружаем всё
+        loadChart();
+        loadTokenInfo();
 
-        document.getElementById('input').addEventListener('keydown', function(e) {
-            if (e.key === 'Enter') sendMessage();
-        });
+        // Обновляем инфу каждые 30 секунд
+        setInterval(loadTokenInfo, 30000);
     </script>
+    <script src="https://s3.tradingview.com/tv.js"></script>
 </body>
 </html>
