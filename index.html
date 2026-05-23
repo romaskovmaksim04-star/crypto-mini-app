@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Crypto Sigma AI</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+            background: #0a0a0a;
+            color: #fff;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        #header {
+            background: #1a1a1a;
+            padding: 12px 16px;
+            text-align: center;
+            border-bottom: 1px solid #333;
+            font-weight: bold;
+            font-size: 16px;
+        }
+        #messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .msg {
+            max-width: 85%;
+            padding: 10px 14px;
+            border-radius: 12px;
+            font-size: 14px;
+            line-height: 1.4;
+        }
+        .msg.user {
+            background: #2563eb;
+            align-self: flex-end;
+        }
+        .msg.ai {
+            background: #1f1f1f;
+            align-self: flex-start;
+            border: 1px solid #333;
+        }
+        #input-area {
+            padding: 12px;
+            border-top: 1px solid #333;
+            display: flex;
+            gap: 8px;
+            background: #1a1a1a;
+        }
+        #input {
+            flex: 1;
+            padding: 10px 14px;
+            border-radius: 20px;
+            border: 1px solid #333;
+            background: #0a0a0a;
+            color: #fff;
+            font-size: 14px;
+            outline: none;
+        }
+        #send {
+            padding: 10px 18px;
+            border-radius: 20px;
+            border: none;
+            background: #2563eb;
+            color: #fff;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .loading { color: #888; font-style: italic; }
+    </style>
+</head>
+<body>
+    <div id="header">🧠 Crypto Sigma AI</div>
+    <div id="messages">
+        <div class="msg ai">
+            👊 Брат, я Доминик — твой крипто-аналитик.<br>
+            Спрашивай про мемкоины, снайпинг, ончейн-анализ, стратегии.<br>
+            Я только по крипте, остальное мимо.
+        </div>
+    </div>
+    <div id="input-area">
+        <input type="text" id="input" placeholder="Спроси про крипту..." autocomplete="off">
+        <button id="send" onclick="sendMessage()">→</button>
+    </div>
+
+    <script>
+        const API_KEY = 'ТВОЙ_OPENROUTER_КЛЮЧ';
+        const messages = [
+            { role: 'system', content: 'Ты Доминик — дерзкий крипто-аналитик. Разбираешься в мемкоинах Solana, снайпинге, ончейн-анализе. Общаешься по-пацански, но по делу. Даёшь конкретные советы с цифрами. Если вопрос не про крипту — отвечаешь что ты только по крипте. Отвечаешь кратко, до 500 символов.' }
+        ];
+
+        async function sendMessage() {
+            const input = document.getElementById('input');
+            const text = input.value.trim();
+            if (!text) return;
+
+            addMessage(text, 'user');
+            input.value = '';
+
+            const loadingId = addMessage('⏳ Думаю...', 'ai loading');
+
+            messages.push({ role: 'user', content: text });
+
+            try {
+                const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${API_KEY}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        model: 'deepseek/deepseek-chat',
+                        messages: messages.slice(-10),
+                        max_tokens: 600
+                    })
+                });
+
+                const data = await response.json();
+                const reply = data.choices[0].message.content;
+                messages.push({ role: 'assistant', content: reply });
+
+                document.getElementById(loadingId).remove();
+                addMessage(reply, 'ai');
+            } catch (e) {
+                document.getElementById(loadingId).remove();
+                addMessage('❌ Ошибка. Попробуй ещё раз.', 'ai');
+            }
+        }
+
+        function addMessage(text, type) {
+            const div = document.createElement('div');
+            div.className = 'msg ' + type;
+            div.textContent = text;
+            const id = 'msg-' + Date.now();
+            div.id = id;
+            document.getElementById('messages').appendChild(div);
+            document.getElementById('messages').scrollTop = document.getElementById('messages').scrollHeight;
+            return id;
+        }
+
+        document.getElementById('input').addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') sendMessage();
+        });
+    </script>
+</body>
+</html>
